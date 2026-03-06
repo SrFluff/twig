@@ -60,10 +60,10 @@ if len(args) == 0 or "--help" in args or (len(args) == 1 and args[0] == "help"):
     help()
 
 elif len(args) == 4 and args[0] == "init" and not os.path.exists(".vcs/"):
-    os.mkdir(".vcs/") 
-    writeMeta(args[1],args[2],args[3])
+    os.mkdir(".vcs/")                      # Makes the vcs directory
+    writeMeta(args[1],args[2],args[3])     # Writes the initial metadata
     
-    with open(".ignore","w") as f:
+    with open(".ignore","w") as f:         # Writes the ignore
         f.write(".vcs\n")
         f.close()
 
@@ -73,27 +73,27 @@ elif len(args) == 3 and args[0] == "push":
         print("ERROR: Not a twig repo.")
         exit()
     
-    writeMeta(getMeta()["name"],args[2],getMeta()["branch"])
+    writeMeta(getMeta()["name"],args[2],getMeta()["branch"]) # Writes the updated version
     
-    with open(".ignore","r") as f:
+    with open(".ignore","r") as f:                           # Checks ignores
         ignore = []
         for i in f:
             ignore.append(i.strip())
         f.close()
-    with open(".message","w") as f:
+    with open(".message","w") as f:                          # Writes commit message
         f.write(args[1] + "\n")
         f.close()
 
     files = os.listdir()
     i = 0
-    while i < len(files):
+    while i < len(files):                                    # Adds non-ignored files
         if files[i] in ignore:
             files.pop(i)
         else:
             i += 1
     
-    compress(f"{getMeta()['name']}",files)
-    commit(getMeta()['name'])
+    compress(f"{getMeta()['name']}",files)                   # Zips up files
+    commit(getMeta()['name'])                                # Pushes zip to current branch
 
 elif len(args) == 3 and args[0] == "branch" and args[1] == "create":
     
@@ -104,7 +104,7 @@ elif len(args) == 3 and args[0] == "branch" and args[1] == "create":
     if not os.path.exists(f".vcs/.{args[2]}"):
         os.mkdir(f".vcs/.{args[2]}")
     
-    writeMeta(getMeta()["name"],getMeta()["version"],args[2])
+    writeMeta(getMeta()["name"],getMeta()["version"],args[2]) # Switches branch
     print("Branch created!")
 
 elif len(args) == 2 and args[0] == "branch" and args[1] == "get":
@@ -152,7 +152,7 @@ elif len(args) == 1 and args[0] == "pull":
         exit()
     
     print("Extracting archive...")
-    os.system(f"unzip -o .vcs/.{getMeta()['branch']}/{getMeta()['name']}.zip > /dev/null 2>&1")
+    os.system(f"unzip -o .vcs/.{getMeta()['branch']}/{getMeta()['name']}.zip > /dev/null 2>&1") # Force overwrites, and silences output
     print("Archive extracted!")
 
 elif len(args) == 3 and args[0] == "branch" and args[1] == "remove":
@@ -162,26 +162,26 @@ elif len(args) == 3 and args[0] == "branch" and args[1] == "remove":
         exit()
     
     if os.path.exists(f".vcs/.{args[2]}/"):
-        os.system(f"rm -rf .vcs/.{args[2]}/")
+        os.system(f"rm -rf .vcs/.{args[2]}/") # There's gotta be a better way, maybe like some for loops
     else:
         print("ERROR: Branch does not exist.")
         exit()
     
     newBranch = "main"
 
-    if getMeta()["branch"] == args[2]:
+    if getMeta()["branch"] == args[2]:        # Checks if the current branch is the one being removed
         files = os.listdir(".vcs/")
         i = 0
         while i < len(files):
-            if files[i][0] != ".":
+            if files[i][0] != ".":            # Checks every branch available
                 files.pop(i)
             else:
-                files[i] = files[i][1:]
+                files[i] = files[i][1:]       # If it starts with ., add it as an available branch
                 i += 1
-        if len(files) > 0:
+        if len(files) > 0:                    # Checks if there are available branches
             newBranch = files[0]
         else:
-            newBranch = "main"
+            newBranch = "main"                # If not, default to main I gues, idk
     writeMeta(getMeta()["name"],getMeta()["version"],newBranch)
     print("Branch removed!")
 
@@ -205,9 +205,9 @@ elif len(args) == 4 and args[0] == "branch" and args[1] == "merge":
         exit()
     
     if os.path.exists(f".vcs/.{args[2]}/") and os.path.exists(f".vcs/.{args[3]}/"):
-        os.system(f"rm -rf .vcs/.{args[2]}/*")
-        os.system(f"cp -r .vcs/.{args[3]}/* .vcs/.{args[2]}/")
-        os.system(f"rm -rf .vcs/.{args[3]}")
+        os.system(f"rm -rf .vcs/.{args[2]}/*")                 # Removes all files in the parent directory
+        os.system(f"cp -r .vcs/.{args[3]}/* .vcs/.{args[2]}/") # Copies over child files
+        os.system(f"rm -rf .vcs/.{args[3]}")                   # Removes child directory
         print("Branches merged!")
         print("WARNING: If you decide to pull the current code, the metadata.json file, with be assigned to the wrong branch.")
     else:
