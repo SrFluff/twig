@@ -1,0 +1,219 @@
+#!/bin/python3
+import zipfile
+import json
+import os
+
+def help():
+    print("Usage: twig <command>\n")
+
+    print("Commands:")
+    print("init   - Usage: twig init <name> <version> <branch>")
+    print("branch - Usage: twig branch [create|merge|remove|switch|get]")
+    print("       - Summary: Manipulates the branches.")
+    print("       - Create <b1>: Makes a new branch.")
+    print("       - Merge <b1> <b2>: Merges branch 2 into branch 1, branch 2 is destroyed.")
+    print("       - Remove <b1>: Removes a specific branch.")
+    print("       - Switch <b1>: Switches to specific branch.")
+    print("       - Get: Returns the current branch")
+    print("       - List: Lists all available branches")
+    print("push   - Usage: twig push <message> <version>")
+    print("       - Summary: Pushes your code to the current branch")
+    print("pull   - Usage: twig pull")
+    print("       - Summary: Pull code from the current branch.")
+
+
+def read(zipFile,fileName):
+    with zipfile.ZipFile(zipFile,"r") as arc:
+        cont = arc.read(fileName)
+        data = cont.decode()
+        return data
+
+def compress(name,files=[]):
+    os.system(f"zip {name}.zip {' '.join(files)} > /dev/null 2>&1")
+
+def getMeta():
+    with open("metadata.json","r") as f:
+        inData = json.loads(f.read())
+        f.close()
+    return inData
+
+def commit(name):
+    if not os.path.exists(f".vcs/.{getMeta()['branch']}/"):
+        os.mkdir(f".vcs/.{getMeta()['branch']}/")
+    if os.path.exists(f".vcs/.{getMeta()['branch']}/{name}.zip"):
+        os.remove(f".vcs/.{getMeta()['branch']}/{name}.zip")
+    os.system(f"mv {name}.zip .vcs/.{getMeta()['branch']}/")
+
+def writeMeta(name,version,branch):
+    with open("metadata.json","w") as f:
+        f.write("{\n")
+        f.write(f'\t"name":"{name}",\n')
+        f.write(f'\t"version":"{version}",\n')
+        f.write(f'\t"branch":"{branch}"\n')
+        f.write("}\n")
+        f.close()
+
+import sys
+args = sys.argv[1:]
+
+if len(args) == 0 or "--help" in args or (len(args) == 1 and args[0] == "help"):
+    help()
+
+elif len(args) == 4 and args[0] == "init" and not os.path.exists(".vcs/"):
+    os.mkdir(".vcs/") 
+    writeMeta(args[1],args[2],args[3])
+    
+    with open(".ignore","w") as f:
+        f.write(".vcs\n")
+        f.close()
+
+elif len(args) == 3 and args[0] == "push":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    writeMeta(getMeta()["name"],args[2],getMeta()["branch"])
+    
+    with open(".ignore","r") as f:
+        ignore = []
+        for i in f:
+            ignore.append(i.strip())
+        f.close()
+    with open(".message","w") as f:
+        f.write(args[1] + "\n")
+        f.close()
+
+    files = os.listdir()
+    i = 0
+    while i < len(files):
+        if files[i] in ignore:
+            files.pop(i)
+        else:
+            i += 1
+    
+    compress(f"{getMeta()['name']}",files)
+    commit(getMeta()['name'])
+
+elif len(args) == 3 and args[0] == "branch" and args[1] == "create":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    if not os.path.exists(f".vcs/.{args[2]}"):
+        os.mkdir(f".vcs/.{args[2]}")
+    
+    writeMeta(getMeta()["name"],getMeta()["version"],args[2])
+    print("Branch created!")
+
+elif len(args) == 2 and args[0] == "branch" and args[1] == "get":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+
+    print(getMeta()["branch"])
+
+elif len(args) == 2 and args[0] == "branch" and args[1] == "list":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    files = os.listdir(".vcs/")
+    i = 0
+    
+    while i < len(files):
+        if files[i][0] != ".":
+            files.pop(i)
+        else:
+            i += 1
+    
+    i = 0
+    
+    while i < len(files):
+        files[i] = files[i][1:]
+        i += 1
+    
+    if len(files) > 0:
+        print("\n".join(files))
+    else:
+        print("No branches, how?")
+
+elif len(args) == 1 and args[0] == "pull":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    if not os.path.exists(f".vcs/.{getMeta()['branch']}/{getMeta()['name']}.zip"):
+        print("ERROR: No code to pull.")
+        exit()
+    
+    print("Extracting archive...")
+    os.system(f"unzip -o .vcs/.{getMeta()['branch']}/{getMeta()['name']}.zip > /dev/null 2>&1")
+    print("Archive extracted!")
+
+elif len(args) == 3 and args[0] == "branch" and args[1] == "remove":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    if os.path.exists(f".vcs/.{args[2]}/"):
+        os.system(f"rm -rf .vcs/.{args[2]}/")
+    else:
+        print("ERROR: Branch does not exist.")
+        exit()
+    
+    newBranch = "main"
+
+    if getMeta()["branch"] == args[2]:
+        files = os.listdir(".vcs/")
+        i = 0
+        while i < len(files):
+            if files[i][0] != ".":
+                files.pop(i)
+            else:
+                files[i] = files[i][1:]
+                i += 1
+        if len(files) > 0:
+            newBranch = files[0]
+        else:
+            newBranch = "main"
+    writeMeta(getMeta()["name"],getMeta()["version"],newBranch)
+    print("Branch removed!")
+
+elif len(args) == 3 and args[0] == "branch" and args[1] == "switch":
+    
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    if not os.path.exists(f".vcs/.{args[2]}/"):
+        print("ERROR: Branch does not exists.")
+        exit()
+    
+    writeMeta(getMeta()["name"],getMeta()["version"],args[2])
+    print(f"Branch switched to '{args[2]}'")
+
+elif len(args) == 4 and args[0] == "branch" and args[1] == "merge":
+
+    if not os.path.exists(".vcs/"):
+        print("ERROR: Not a twig repo.")
+        exit()
+    
+    if os.path.exists(f".vcs/.{args[2]}/") and os.path.exists(f".vcs/.{args[3]}/"):
+        os.system(f"rm -rf .vcs/.{args[2]}/*")
+        os.system(f"cp -r .vcs/.{args[3]}/* .vcs/.{args[2]}/")
+        os.system(f"rm -rf .vcs/.{args[3]}")
+        print("Branches merged!")
+        print("WARNING: If you decide to pull the current code, the metadata.json file, with be assigned to the wrong branch.")
+    else:
+        print("ERROR: One, or both, of these branches do not exist.")
+        exit()
+    
+        if getMeta()["branch"] == args[3]:
+            writeMeta(getMeta()["name"],getMeta()["version"],args[2])
+            print(f"Branch switched to '{args[2]}'")
